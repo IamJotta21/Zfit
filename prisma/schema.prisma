@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  TRAINER
+  STUDENT
+}
+
+enum StudentStatus {
+  ACTIVE
+  PENDING_PAYMENT
+  INACTIVE
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String?
+  role          Role
+  fullName      String
+  avatarUrl     String?
+  phone         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  trainerConfig TrainerConfig?
+  student       Student?       @relation("StudentUser")
+  
+  trainerStudents Student[]    @relation("TrainerStudents")
+  trainerPlans    Plan[]       @relation("TrainerPlans")
+  trainerWorkouts Workout[]    @relation("TrainerWorkouts")
+}
+
+model TrainerConfig {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logoUrl               String?
+  brandColorPrimary     String?  @default("#10b981")
+  brandColorSecondary   String?  @default("#141416")
+  autoBlockDelayDays    Int      @default(3)
+  customRpeEnabled      Boolean  @default(false)
+}
+
+model Student {
+  id             String        @id @default(uuid())
+  userId         String        @unique
+  user           User          @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
+  trainerId      String
+  trainer        User          @relation("TrainerStudents", fields: [trainerId], references: [id], onDelete: Cascade)
+  activePlanId   String?
+  plan           Plan?         @relation(fields: [activePlanId], references: [id], onDelete: SetNull)
+  status         StudentStatus @default(ACTIVE)
+  anamneseData   Json?         
+  
+  workouts       Workout[]     @relation("StudentWorkouts")
+  workoutLogs    WorkoutLog[]
+}
+
+model Plan {
+  id             String       @id @default(uuid())
+  trainerId      String
+  trainer        User         @relation("TrainerPlans", fields: [trainerId], references: [id], onDelete: Cascade)
+  title          String
+  priceCents     Int
+  billingCycle   BillingCycle
+  isActive       Boolean      @default(true)
+  featuresList   String[]
+
+  students       Student[]
+}
+
+model Workout {
+  id                    String   @id @default(uuid())
+  studentId             String?
+  student               Student? @relation("StudentWorkouts", fields: [studentId], references: [id], onDelete: Cascade)
+  trainerId             String
+  trainer               User     @relation("TrainerWorkouts", fields: [trainerId], references: [id], onDelete: Cascade)
+  name                  String
+  objective             String?
+  scheduledDate         DateTime?
+  estimatedDuration     Int?     // in minutes
+  difficultyLevel       String?
+  restIntervalSeconds   Int?
+  coachNotes            String?
+  isTemplate            Boolean  @default(false)
+  createdAt             DateTime @default(now())
+
+  exercises             ExerciseMatrix[]
+  logs                  WorkoutLog[]
+}
+
+model ExerciseMatrix {
+  id             String  @id @default(uuid())
+  workoutId      String
+  workout        Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exerciseName   String
+  setsCount      Int
+  repsOrRpe      String
+  loadKg         Float?
+  restSeconds    Int?
+  videoUrl       String?
+  orderIndex     Int     @default(0)
+}
+
+model WorkoutLog {
+  id                  String   @id @default(uuid())
+  studentId           String
+  student             Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  workoutId           String
+  workout             Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  completedAt         DateTime @default(now())
+  feedbackLoadRating  String?
+  energyLevel         Int?
+}
